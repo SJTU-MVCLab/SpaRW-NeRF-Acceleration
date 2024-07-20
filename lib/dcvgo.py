@@ -14,6 +14,8 @@ from .dvgo import Raw2Alpha, Alphas2Weights
 from .dmpigo import create_full_step_id
 
 from torch.utils.cpp_extension import load
+
+os.environ["TORCH_CUDA_ARCH_LIST"] = "8.0"
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 ub360_utils_cuda = load(
         name='ub360_utils_cuda',

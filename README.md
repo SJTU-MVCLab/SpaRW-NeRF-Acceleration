@@ -23,7 +23,7 @@ pip install -r requirements.txt
 </details>
 
 
-## Directory structure for the datasets
+## Directory Structure For The Datasets
 
 <details>
   <summary> (click to expand;) </summary>
@@ -155,9 +155,12 @@ pip install -r requirements.txt
         configs/llff:
         fern.py  flower.py  fortress.py  horns.py  leaves.py  orchids.py  room.py  trex.py
     </details>
-## Rendering with your own code
+## Rendering With Your Own Code!
 `dvgo.render_utils_cuda.sparw` can warp the image from the reference frame to the target frame image, and then use the returned mask to render the occluded areas of the image with your own model.
-> std::vector\<torch::tensor\> dvgo.render_utils_cuda.sparw(ref_img, ref_depth, tgt_depth, ref_K, tgt_K, ref_c2w, tgt_c2w, H, W);
+
+```python
+dvgo.render_utils_cuda.sparw(ref_img, ref_depth, tgt_depth, ref_K, tgt_K, ref_c2w, tgt_c2w, H, W)
+```
 ### PARAMETERS:
   - `ref_img` (`torch.Tensor`, CPU): The image in the reference frame.
   - `ref_depth` (`torch.Tensor`, GPU): The depth estimation in the reference frame.
