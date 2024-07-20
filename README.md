@@ -5,7 +5,7 @@ https://github.com/user-attachments/assets/6c7dbc00-aedf-4e68-9f8c-23f368a12b24
 
 ### Installation
 ```
-git clone ...
+git clone https://github.com/SJTU-MVCLab/SPARW.git
 cd SPARW
 pip install -r requirements.txt
 ```
