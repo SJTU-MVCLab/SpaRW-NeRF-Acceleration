@@ -1,6 +1,7 @@
 # SPARW
 **This is the implementation of the SPARW algorithm from the paper [Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations](https://arxiv.org/abs/2404.11852).**
-<video width="320" height="240" controls><source src="figs/video.rgb.mp4" type="video/mp4"></video>
+
+https://github.com/user-attachments/assets/6c7dbc00-aedf-4e68-9f8c-23f368a12b24
 
 ### Installation
 ```
