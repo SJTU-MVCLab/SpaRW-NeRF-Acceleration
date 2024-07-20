@@ -11,6 +11,9 @@ from torch_scatter import segment_coo
 
 from . import grid
 from torch.utils.cpp_extension import load
+
+os.environ["TORCH_CUDA_ARCH_LIST"] = "8.0"
+
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 render_utils_cuda = load(
         name='render_utils_cuda',

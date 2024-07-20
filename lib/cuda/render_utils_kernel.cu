@@ -1,9 +1,233 @@
 #include <torch/extension.h>
-
+#include <stdio.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include <vector>
+#include <stdint.h>
+
+template <typename scalar_t>
+__global__ void get_inference_mask_cuda_kernel(
+    scalar_t* __restrict__ depth,
+    scalar_t* __restrict__ z_buffer,
+    bool* __restrict__ mask,
+    const int H,
+    const int W
+) {
+  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if(idx < H * W) {
+    scalar_t z = depth[3*idx];
+    scalar_t z_ref = z_buffer[idx];
+    mask[idx] = (0 < z) && (z < z_ref * 0.995);
+  }
+}
+
+template <typename scalar_t>
+__global__ void compute_pcd_cuda_kernel(
+    scalar_t* __restrict__ depth,
+    scalar_t* __restrict__ K,
+    scalar_t* __restrict__ pcd,
+    const int H,
+    const int W
+) {
+  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int row = idx / W;
+  const int col = idx % W;
+  const int offset = 3 * idx;
+
+  const scalar_t fx = K[0]; // K[0][0]
+  const scalar_t cx = K[2]; // K[0][2]
+  const scalar_t fy = K[4]; // K[1][1]
+  const scalar_t cy = K[5]; // K[1][2]
+
+  if(row < H)
+  {
+    scalar_t d = depth[offset];
+    pcd[offset] = (static_cast<scalar_t>(col) + 0.5 - cx) * d / fx;
+    pcd[offset + 1] = -(static_cast<scalar_t>(row) + 0.5 - cy) * d / fy;
+    pcd[offset + 2] = -d;
+  }
+}
+
+template <typename scalar_t>
+__global__ void pcd_to_xyz_cuda_kernel(
+    scalar_t* __restrict__ pcd,
+    scalar_t* __restrict__ K,
+    scalar_t* __restrict__ tgt_xyz,
+    const int H,
+    const int W
+) {
+  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int offset = 3 * idx;
+
+  const scalar_t fx = K[0]; // K[0][0]
+  const scalar_t cx = K[2]; // K[0][2]
+  const scalar_t fy = K[4]; // K[1][1]
+  const scalar_t cy = K[5]; // K[1][2]
+
+  if(idx < H * W)
+  {
+    scalar_t x = pcd[offset];
+    scalar_t y = pcd[offset + 1];
+    scalar_t z = pcd[offset + 2];
+
+    // negate the z value.
+    z = (z < 0) ? -z : z;
+    tgt_xyz[offset] = (cx + x / z * fx - 0.5);
+    tgt_xyz[offset + 1] = (cy - y / z * fy - 0.5);
+    tgt_xyz[offset + 2] = z;
+  }
+}
+
+torch::Tensor compose_pcd(
+    torch::Tensor& depth, 
+    torch::Tensor& K,
+    const int H, 
+    const int W
+) {
+    auto pcd = torch::empty({H, W, 3}, depth.options());
+
+    const int threads = 512;
+    const int blocks = (H * W + threads - 1) / threads;
+    
+    AT_DISPATCH_FLOATING_TYPES(depth.type(), "compute_pcd_cuda_kernel", ([&] {
+    compute_pcd_cuda_kernel<scalar_t><<<blocks, threads>>>(
+      depth.data<scalar_t>(),
+      K.data<scalar_t>(),
+      pcd.data<scalar_t>(),
+      H, W);
+    }));
+
+    return pcd;
+}
+
+torch::Tensor transform(
+    torch::Tensor& pcd,
+    torch::Tensor& transform_matrix
+) {
+  auto ones = torch::ones({pcd.size(0), pcd.size(1), 1}, pcd.options());
+  auto pcd_expand = torch::cat({pcd, ones}, 2);
+  auto reshape_pcd_expand = pcd_expand.view({-1, 4});
+
+  auto tgt_points = torch::matmul(reshape_pcd_expand, transform_matrix.transpose(1, 0));
+  auto tgt_pcd = tgt_points.index({"...", torch::indexing::Slice(torch::indexing::None, 3)}) / tgt_points.index({"...", 3}).unsqueeze(1);
+
+  return tgt_pcd.view({pcd.size(0), pcd.size(1), 3});
+}
+
+torch::Tensor pcd_to_xyz(
+    torch::Tensor& tgt_pcd,
+    torch::Tensor& tgt_K,
+    const int H,
+    const int W
+) {
+  auto tgt_xyz = torch::empty_like(tgt_pcd);
+  const int threads = 512;
+  const int blocks = (H * W + threads - 1 ) / threads;
+  AT_DISPATCH_FLOATING_TYPES(tgt_pcd.type(), "pcd_to_xyz_cuda_kernel", ([&] {
+    pcd_to_xyz_cuda_kernel<scalar_t><<<blocks, threads>>>(
+      tgt_pcd.data<scalar_t>(),
+      tgt_K.data<scalar_t>(),
+      tgt_xyz.data<scalar_t>(),
+      H, W);
+    }));
+  
+  return tgt_xyz;
+}
+
+torch::Tensor inference_mask(
+    torch::Tensor& tgt_depth,
+    torch::Tensor& z_buffer,
+    const int H,
+    const int W
+) {
+  auto options = torch::TensorOptions()
+    .dtype(torch::kBool)
+    .layout(torch::kStrided)
+    .device(torch::kCUDA)
+    .requires_grad(false);
+  auto mask = torch::empty({H, W}, options);
+
+  const int threads = 512;
+  const int blocks = (H * W + threads - 1) / threads;
+  AT_DISPATCH_FLOATING_TYPES(tgt_depth.type(), "get_inference_mask_cuda_kernel", ([&] {
+    get_inference_mask_cuda_kernel<scalar_t><<<blocks, threads>>>(
+      tgt_depth.data<scalar_t>(),
+      z_buffer.data<scalar_t>(),
+      mask.data<bool>(),
+      H, W);
+    }));
+  
+  return mask;
+}
+
+std::vector<torch::Tensor> sparw(
+    torch::Tensor ref_img,
+    torch::Tensor ref_depth,
+    torch::Tensor tgt_depth,
+    torch::Tensor ref_K,
+    torch::Tensor tgt_K,
+    torch::Tensor ref_c2w,
+    torch::Tensor tgt_c2w,
+    const int H, 
+    const int W
+) {
+  auto tgt_w2c = torch::linalg::inv(tgt_c2w);
+
+  // generate reference point cloud.
+  auto ref_pcd = compose_pcd(ref_depth, ref_K, H, W);
+  
+  // transport from reference coordinate to target coordinate.
+  auto w_pcd = transform(ref_pcd, ref_c2w);
+  auto tgt_pcd = transform(w_pcd, tgt_w2c);
+
+  // transport to image coordinate.
+  auto tgt_xyz = pcd_to_xyz(tgt_pcd, tgt_K, H, W);
+
+  // warp reference image into target image.
+  float *restored_img_p = new float[H*W*3];
+  for(int i=0;i<H*W*3;++i){
+    restored_img_p[i] = 1;
+  }
+
+  auto buffer_cpu = torch::zeros({H, W}) + 10; // assume the maximum depth range is 10.
+  auto xyz_cpu = tgt_xyz.to(torch::kCPU);
+  auto ref_img_cpu = ref_img.to(torch::kCPU);
+
+  auto buffer_accessor = buffer_cpu.accessor<float, 2>();
+  auto xyz_accessor = xyz_cpu.accessor<float, 3>();
+  auto ref_img_accessor = ref_img_cpu.accessor<float, 3>();
+
+  for(int i=0;i<H;++i)
+  {
+    for(int j=0;j<W;++j)
+    {
+      int x_coord = (int)(xyz_accessor[i][j][0]+0.5);
+      int y_coord = (int)(xyz_accessor[i][j][1]+0.5);
+      float z = xyz_accessor[i][j][2];
+      // printf("x_coord %d, y_coord %d, z %.4f, i %d, j %d\n", x_coord, y_coord, z, i, j);
+      if(0<=y_coord && y_coord<H && 0<=x_coord && x_coord<W && z<buffer_accessor[y_coord][x_coord])
+      {
+        buffer_accessor[y_coord][x_coord] = z;
+
+        int idx = 3*(y_coord * W + x_coord);
+        restored_img_p[idx    ] = ref_img_accessor[i][j][0];
+        restored_img_p[idx + 1] = ref_img_accessor[i][j][1];
+        restored_img_p[idx + 2] = ref_img_accessor[i][j][2];
+      }
+    }
+  }
+
+  auto restored_img = torch::from_blob(restored_img_p, {H, W, 3}).clone();
+  delete[] restored_img_p;
+
+  // get inference_ray_mask
+  auto buffer_cuda = buffer_cpu.to(torch::kCUDA);
+  auto mask = inference_mask(tgt_depth, buffer_cuda, H, W);
+  
+  return {restored_img, mask};
+}
 
 /*
    Points sampling helper functions.

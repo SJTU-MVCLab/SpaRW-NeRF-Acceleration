@@ -3,6 +3,16 @@
 #include <vector>
 
 // CUDA forward declarations
+std::vector<torch::Tensor> sparw(
+        torch::Tensor ref_img,
+        torch::Tensor ref_depth,
+        torch::Tensor tgt_depth,
+        torch::Tensor ref_K,
+        torch::Tensor tgt_K,
+        torch::Tensor ref_c2w,
+        torch::Tensor tgt_c2w,
+        const int H, 
+        const int W);
 
 std::vector<torch::Tensor> infer_t_minmax_cuda(
         torch::Tensor rays_o, torch::Tensor rays_d, torch::Tensor xyz_min, torch::Tensor xyz_max,
@@ -168,6 +178,7 @@ torch::Tensor alpha2weight_backward(
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+  m.def("sparw", &sparw, "Warp reference image into target image");
   m.def("infer_t_minmax", &infer_t_minmax, "Inference t_min and t_max of ray-bbox intersection");
   m.def("infer_n_samples", &infer_n_samples, "Inference the number of points to sample on each ray");
   m.def("infer_ray_start_dir", &infer_ray_start_dir, "Inference the starting point and shooting direction of each ray");

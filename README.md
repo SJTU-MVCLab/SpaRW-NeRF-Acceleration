@@ -1,40 +1,9 @@
-# DirectVoxGO
-
-Direct Voxel Grid Optimization (CVPR2022 Oral, [project page](https://sunset1995.github.io/dvgo/), [DVGO paper](https://arxiv.org/abs/2111.11215), [DVGO v2 paper](https://arxiv.org/abs/2206.05085)).
-
-https://user-images.githubusercontent.com/2712505/153380311-19d6c3a1-9130-489a-af16-ad36c78f10a9.mp4
-
-https://user-images.githubusercontent.com/2712505/153380197-991d1689-6418-499c-a192-d757f9a64b64.mp4
-
-### Custom casual capturing
-A [short guide](https://sunset1995.github.io/dvgo/tutor_forward_facing.html) to capture custom forward-facing scenes and rendering fly-through videos.
-
-Below are two rgb and depth fly-through videos from custom captured scenes.
-
-https://user-images.githubusercontent.com/2712505/174267754-619d4f81-dd04-4c50-ba7f-434774cb890e.mp4
-
-### Features
-- Speedup NeRF by replacing the MLP with the voxel grid.
-- Simple scene representation:
-    - *Volume densities*: dense voxel grid (3D).
-    - *View-dependent colors*: dense feature grid (4D) + shallow MLP.
-- Pytorch cuda extention built just-in-time for another 2--3x speedup.
-- O(N) realization for the distortion loss proposed by [mip-nerf 360](https://jonbarron.info/mipnerf360/).
-    - The loss improves our training time and quality.
-    - We have released a self-contained pytorch package: [torch_efficient_distloss](https://github.com/sunset1995/torch_efficient_distloss).
-    - Consider a batch of 8192 rays X 256 points.
-        - GPU memory consumption: 6192MB => 96MB.
-        - Run times for 100 iters: 20 sec => 0.2sec.
-- Supported datasets:
-    - *Bounded inward-facing*: [NeRF](https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1), [NSVF](https://dl.fbaipublicfiles.com/nsvf/dataset/Synthetic_NSVF.zip), [BlendedMVS](https://dl.fbaipublicfiles.com/nsvf/dataset/BlendedMVS.zip), [T&T (masked)](https://dl.fbaipublicfiles.com/nsvf/dataset/TanksAndTemple.zip), [DeepVoxels](https://drive.google.com/open?id=1ScsRlnzy9Bd_n-xw83SP-0t548v63mPH).
-    - *Unbounded inward-facing*: [T&T](https://drive.google.com/file/d/11KRfN91W1AxAW6lOFs4EeYDbeoQZCi87/view?usp=sharing), [LF](https://drive.google.com/file/d/1gsjDjkbTh4GAR9fFqlIDZ__qR9NYTURQ/view?usp=sharing), [mip-NeRF360](https://jonbarron.info/mipnerf360/).
-    - *Foward-facing*: [LLFF](https://drive.google.com/drive/folders/14boI-o5hGO9srnWaaogTU5_ji7wkX2S7).
-
-
+# SPARW
+**This is the implementation of the SPARW algorithm from the paper [Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations](https://arxiv.org/abs/2404.11852).**
 ### Installation
 ```
-git clone git@github.com:sunset1995/DirectVoxGO.git
-cd DirectVoxGO
+git clone ...
+cd SPARW
 pip install -r requirements.txt
 ```
 [Pytorch](https://pytorch.org/) and [torch_scatter](https://github.com/rusty1s/pytorch_scatter) installation is machine dependent, please install the correct version for your machine.
@@ -135,8 +104,6 @@ pip install -r requirements.txt
                     └── frame*.png
 </details>
 
-
-
 ## GO
 
 - Training
@@ -188,51 +155,23 @@ pip install -r requirements.txt
         configs/llff:
         fern.py  flower.py  fortress.py  horns.py  leaves.py  orchids.py  room.py  trex.py
     </details>
+## Rendering with your own code
+`dvgo.render_utils_cuda.sparw` can warp the image from the reference frame to the target frame image, and then use the returned mask to render the occluded areas of the image with your own model.
+> std::vector\<torch::tensor\> dvgo.render_utils_cuda.sparw(ref_img, ref_depth, tgt_depth, ref_K, tgt_K, ref_c2w, tgt_c2w, H, W);
+### PARAMETERS:
+  - `ref_img` (`torch.Tensor`, CPU): The image in the reference frame.
+  - `ref_depth` (`torch.Tensor`, GPU): The depth estimation in the reference frame.
+  - `tgt_depth` (`torch.Tensor`, GPU): The depth estimation in the target frame.
+  - `ref_K` (`torch.Tensor`, GPU): Reference frame intrinsic matrix tensor.
+  - `tgt_K` (`torch.Tensor`, GPU): Target frame intrinsic matrix tensor.
+  - `ref_c2w` (`torch.Tensor`, GPU): Reference frame camera-to-world transformation matrix tensor.
+  - `tgt_c2w` (`torch.Tensor`, GPU): Target frame camera-to-world transformation matrix tensor.
+  - `H` (`int`): Image height.
+  - `W` (`int`): Image width.
 
-### Custom casually captured scenes
-Coming soon hopefully.
-
-### Development and tuning guide
-#### Extention to new dataset
-Adjusting the data related config fields to fit your camera coordinate system is recommend before implementing a new one.
-We provide two visualization tools for debugging.
-1. Inspect the camera and the allocated BBox.
-    - Export via `--export_bbox_and_cams_only {filename}.npz`:
-      ```bash
-      python run.py --config configs/nerf/mic.py --export_bbox_and_cams_only cam_mic.npz
-      ```
-    - Visualize the result:
-      ```bash
-      python tools/vis_train.py cam_mic.npz
-      ```
-2. Inspect the learned geometry after coarse optimization.
-    - Export via `--export_coarse_only {filename}.npz` (assumed `coarse_last.tar` available in the train log):
-      ```bash
-      python run.py --config configs/nerf/mic.py --export_coarse_only coarse_mic.npz
-      ```
-    - Visualize the result:
-      ```bash
-      python tools/vis_volume.py coarse_mic.npz 0.001 --cam cam_mic.npz
-      ```
-
-| Inspecting the cameras & BBox | Inspecting the learned coarse volume |
-|:-:|:-:|
-|![](figs/debug_cam_and_bbox.png)|![](figs/debug_coarse_volume.png)|
-
-
-
-#### Speed and quality tradeoff
-We have reported some ablation experiments in our paper supplementary material.
-Setting `N_iters`, `N_rand`, `num_voxels`, `rgbnet_depth`, `rgbnet_width` to larger values or setting `stepsize` to smaller values typically leads to better quality but need more computation.
-The `weight_distortion` affects the training speed and quality as well.
-Only `stepsize` is tunable in testing phase, while all the other fields should remain the same as training.
-
-## Advanced data structure
-- **Octree** — [Plenoxels: Radiance Fields without Neural Networks](https://alexyu.net/plenoxels/).
-- **Hash** — [Instant Neural Graphics Primitives with a Multiresolution Hash Encoding](https://nvlabs.github.io/instant-ngp/).
-- **Factorized components** — [TensoRF: Tensorial Radiance Fields](https://apchenstu.github.io/TensoRF/).
-
-You will need them for scaling to a higher grid resolution. But we believe our simplest dense grid could still be your good starting point if you have other challenging problems to deal with.
+### RETURNS:
+  - `warped_img` (`torch.Tensor`, CPU): Warped image tensor. This tensor contains the image data from the reference frame that has been transformed (warped) to align with the target frame.
+  - `mask` (`torch.Tensor`, GPU): Mask tensor. This tensor indicates which regions of the warped image are invalid and should be considered for further processing. Typically, it marks the occluded or invalid areas with `True`.
 
 ## Acknowledgement
-The code base is origined from an awesome [nerf-pytorch](https://github.com/yenchenlin/nerf-pytorch) implementation, but it becomes very different from the code base now.
+The code base is origined from the [DirectVoxGO](https://github.com/sunset1995/DirectVoxGO) implementation.
