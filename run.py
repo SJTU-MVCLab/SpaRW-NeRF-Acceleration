@@ -101,7 +101,7 @@ def inference(model, H, W, K, c2w, ndc, render_kwargs, cfg):
     return rgb
 
 @torch.no_grad()
-def sparw_render_viewpoints(model, render_poses, HW, Ks, ndc, render_kwargs,
+def sparw_render_viewpoints(model, render_poses, depth_maps, HW, Ks, ndc, render_kwargs,
                       gt_imgs=None, savedir=None, dump_images=False,
                       render_factor=0, render_video_flipy=False, render_video_rot90=0,
                       eval_ssim=False, eval_lpips_alex=False, eval_lpips_vgg=False):
@@ -121,9 +121,7 @@ def sparw_render_viewpoints(model, render_poses, HW, Ks, ndc, render_kwargs,
     lpips_alex = []
     lpips_vgg = []
 
-    depth_fn_prefix = 'data/nerf_synthetic/lego/depth/r_'
     rgb_caches = {}
-    depth_caches = {}
     device = "cuda"
     render_poses = [torch.Tensor(pose).to(device) for pose in render_poses]
     Ks =  [torch.Tensor(K).to(device) for K in Ks]
@@ -131,17 +129,16 @@ def sparw_render_viewpoints(model, render_poses, HW, Ks, ndc, render_kwargs,
     for i, c2w in enumerate(tqdm(render_poses)):
         H, W = HW[i]
         K = Ks[i]
-        depth_map = torch.Tensor(load_depth(depth_fn_prefix + f'{i}.exr')).to(device)
+        depth_map = depth_maps[i]
         
         ref_i = get_reference_frame(i, len(render_poses))
         ref_c2w = render_poses[ref_i]
         ref_K = Ks[ref_i]
         
-        if ref_i not in depth_caches:
-            depth_caches[ref_i] = torch.Tensor(load_depth(depth_fn_prefix + f'{ref_i}.exr')).to(device)
+        if ref_i not in rgb_caches:
             rgb_caches[ref_i] = inference(model, HW[ref_i][0], HW[ref_i][1], ref_K, ref_c2w, ndc, render_kwargs, cfg).cpu()
         
-        ref_depth_map = depth_caches[ref_i]
+        ref_depth_map = depth_maps[ref_i]
         ref_rgb = rgb_caches[ref_i]
         
         if ref_i == i:
@@ -830,6 +827,9 @@ if __name__=='__main__':
 
     # render testset and eval
     if args.render_test:
+        depth_fn_prefix = os.path.join(cfg.data.datadir, 'depth')
+        depth_maps = [torch.Tensor(load_depth(depth_fn_prefix + f'/r_{i}.exr')).to(device) for i in range(len(data_dict['i_test']))]
+        
         testsavedir = os.path.join(cfg.basedir, cfg.expname, f'render_test_{ckpt_name}')
         os.makedirs(testsavedir, exist_ok=True)
         print('All results are dumped into', testsavedir)
@@ -841,6 +841,7 @@ if __name__=='__main__':
         ) as p:            
             rgbs = sparw_render_viewpoints(
                 render_poses=data_dict['poses'][data_dict['i_test']],
+                depth_maps=depth_maps,
                 HW=data_dict['HW'][data_dict['i_test']],
                 Ks=data_dict['Ks'][data_dict['i_test']],
                 gt_imgs=[data_dict['images'][i].cpu().numpy() for i in data_dict['i_test']],
@@ -863,39 +864,6 @@ if __name__=='__main__':
             
         imageio.mimwrite(os.path.join(testsavedir, 'video.rgb.mp4'), utils.to8b(rgbs), fps=30, quality=8)
         # imageio.mimwrite(os.path.join(testsavedir, 'video.depth.mp4'), utils.to8b(1 - depths / np.max(depths)), fps=30, quality=8)
-    
-    # render video
-    if args.render_video:
-        testsavedir = os.path.join(cfg.basedir, cfg.expname, f'render_video_{ckpt_name}')
-        os.makedirs(testsavedir, exist_ok=True)
-        print('All results are dumped into', testsavedir)
-        
-        rgbs = sparw_render_viewpoints(
-                render_poses=data_dict['render_poses'],
-                HW=data_dict['HW'][data_dict['i_test']][[0]].repeat(len(data_dict['render_poses']), 0),
-                Ks=data_dict['Ks'][data_dict['i_test']][[0]].repeat(len(data_dict['render_poses']), 0),
-                render_factor=args.render_video_factor,
-                render_video_flipy=args.render_video_flipy,
-                render_video_rot90=args.render_video_rot90,
-                savedir=testsavedir, dump_images=args.dump_images,
-                **render_viewpoints_kwargs)
-
-        # rgbs, depths, bgmaps = render_viewpoints(
-        #         render_poses=data_dict['render_poses'],
-        #         HW=data_dict['HW'][data_dict['i_test']][[0]].repeat(len(data_dict['render_poses']), 0),
-        #         Ks=data_dict['Ks'][data_dict['i_test']][[0]].repeat(len(data_dict['render_poses']), 0),
-        #         render_factor=args.render_video_factor,
-        #         render_video_flipy=args.render_video_flipy,
-        #         render_video_rot90=args.render_video_rot90,
-        #         savedir=testsavedir, dump_images=args.dump_images,
-        #         **render_viewpoints_kwargs)
-            
-        imageio.mimwrite(os.path.join(testsavedir, 'video.rgb.mp4'), utils.to8b(rgbs), fps=30, quality=8)
-        # import matplotlib.pyplot as plt
-        # depths_vis = depths * (1-bgmaps) + bgmaps
-        # dmin, dmax = np.percentile(depths_vis[bgmaps < 0.1], q=[5, 95])
-        # depth_vis = plt.get_cmap('rainbow')(1 - np.clip((depths_vis - dmin) / (dmax - dmin), 0, 1)).squeeze()[..., :3]
-        # imageio.mimwrite(os.path.join(testsavedir, 'video.depth.mp4'), utils.to8b(depth_vis), fps=30, quality=8)
 
     print('Done')
 

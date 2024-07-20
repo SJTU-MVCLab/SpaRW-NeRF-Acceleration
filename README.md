@@ -1,5 +1,7 @@
 # SPARW
 **This is the implementation of the SPARW algorithm from the paper [Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations](https://arxiv.org/abs/2404.11852).**
+<video width="320" height="240" controls><source src="figs/video.rgb.mp4" type="video/mp4"></video>
+
 ### Installation
 ```
 git clone ...
@@ -33,7 +35,10 @@ pip install -r requirements.txt
     │   └── [chair|drums|ficus|hotdog|lego|materials|mic|ship]
     │       ├── [train|val|test]
     │       │   └── r_*.png
-    │       └── transforms_[train|val|test].json
+    │       ├── transforms_[train|val|test].json
+    |       |
+    |       └── depth
+    |           └── r_*.exr
     │
     ├── Synthetic_NSVF     # Link: https://dl.fbaipublicfiles.com/nsvf/dataset/Synthetic_NSVF.zip
     │   └── [Bike|Lifestyle|Palace|Robot|Spaceship|Steamtrain|Toad|Wineholder]
@@ -118,11 +123,11 @@ pip install -r requirements.txt
                                                   --eval_ssim --eval_lpips_vgg
     ```
     Use `--eval_lpips_alex` to evaluate LPIPS with pre-trained Alex net instead of VGG net.
-- Render video
+<!-- - Render video
     ```bash
     $ python run.py --config configs/nerf/lego.py --render_only --render_video
     ```
-    Use `--render_video_factor 4` for a fast preview.
+    Use `--render_video_factor 4` for a fast preview. -->
 - Reproduction: all config files to reproduce our results.
     <details>
         <summary> (click to expand) </summary>
