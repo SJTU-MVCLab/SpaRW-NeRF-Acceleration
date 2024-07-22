@@ -2,6 +2,9 @@
 
 This is the implementation of the SpaRW algorithm from the paper: `Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations` [arxiv link](https://arxiv.org/abs/2404.11852).
 
+[![teaser](https://github.com/user-attachments/assets/7070672a-660c-4d5d-b7f8-d2f4127dbbbc)](https://youtu.be/eCiwp5VY9Qo)
+(Click this figure to see the comparison between our method and the ground truth)
+
 ## What is it?
 
 This repository implements Cicero's sparse radiance warping (SpaRW) algorithm (published on ISCA'2024). This algorithm exploits the radiance similarity across rays from nearby camera views to reduce the overall computation. 
