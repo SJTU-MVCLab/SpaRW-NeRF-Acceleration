@@ -96,3 +96,15 @@ The detailed parameter explanation:
 
 ## Acknowledgement
 The repository heavily borrows the code from the [DirectVoxGO](https://github.com/sunset1995/DirectVoxGO) implementation.
+
+## Citation
+
+Please kindly consider citing this paper in your publications if it helps your research.
+```
+@inproceedings{feng2023cicero,
+  title={Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations},
+  author={Feng, Yu and Liu, Zihan and Leng, Jingwen and Guo, Minyi and Zhu, Yuhao},
+  booktitle={Proceedings of the 51st Annual International Symposium on Computer Architecture},
+  year={2024}
+}
+```
