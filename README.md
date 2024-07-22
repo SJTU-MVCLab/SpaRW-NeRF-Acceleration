@@ -1,4 +1,4 @@
-# SpaRW
+# SpaRW: A Plug-and-Play NeRF Acceleration Extension
 
 This is the implementation of the SpaRW algorithm from the paper: `Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations` [arxiv link](https://arxiv.org/abs/2404.11852).
 
