@@ -1,10 +1,11 @@
 # SPARW
-**This is the implementation of the SpaRW algorithm from the paper [Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations](https://arxiv.org/abs/2404.11852).**
+
+This is the implementation of the SpaRW algorithm from the paper: `Cicero: Addressing Algorithmic and Architectural Bottlenecks in Neural Rendering by Radiance Warping and Memory Optimizations` [arxiv link](https://arxiv.org/abs/2404.11852).
 
 ## What is it?
 
 This repository implements Cicero's sparse radiance warping (SpaRW) algorithm (published on ISCA'2024). This algorithm exploits the radiance similarity across rays from nearby camera views to reduce the overall computation. 
-Note that, SpaRW is not a new NeRF algorithm, rather, it is a plug-and-play extension to *virtually* all NeRF algorithms. In this repository, we simply extend the [DirectVoxGO](https://github.com/sunset1995/DirectVoxGO) as an example to demonstrate our algorithm.
+Note that, SpaRW is not a new NeRF algorithm. Rather, it is a plug-and-play extension to *virtually* all NeRF algorithms. In this repository, we extend the [DirectVoxGO](https://github.com/sunset1995/DirectVoxGO) as an example to demonstrate our algorithm.
 
 ## How to Run
 
@@ -51,7 +52,7 @@ The downloaded dataset should be stored in the `data` directory, the directory s
           │   └── r_*.png
           ├── transforms_[train|val|test].json
           |
-          └── depth      # This is new compared to original SyntheticNeRF!
+          └── depth      # This is new compared to the original SyntheticNeRF!
               └── r_*.exr
 ```
 
@@ -62,7 +63,7 @@ Note that, our implementation **does not require training**, but we provide a tr
    $ python run.py --config configs/nerf/lego.py --render_test
 ```
 
-To evaluate SpaRW algorithm, please run:
+To evaluate our SpaRW algorithm, please run:
 ```bash
   $ python run.py --config configs/nerf/lego.py --render_only --render_test --eval_ssim
 ```
