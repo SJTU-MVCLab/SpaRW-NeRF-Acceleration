@@ -46,8 +46,8 @@ The downloaded dataset should be stored in the `data` directory, the directory s
 
 ```
   data
-  └── nerf_synthetic     # Link:  https://drive.google.com/drive/folders/1svMEQ_0kdw_qQYm7wZv7RPiX2RZ6vZxJ?usp=sharing
-      └── [chair|drums|ficus|hotdog|lego|materials|mic|ship]
+  └── nerf_synthetic    
+      └── [chair|drums|hotdog|lego|mic|ship]
           ├── [train|val|test]
           │   └── r_*.png
           ├── transforms_[train|val|test].json
