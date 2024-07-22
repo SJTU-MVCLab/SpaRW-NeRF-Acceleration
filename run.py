@@ -833,34 +833,25 @@ if __name__=='__main__':
         testsavedir = os.path.join(cfg.basedir, cfg.expname, f'render_test_{ckpt_name}')
         os.makedirs(testsavedir, exist_ok=True)
         print('All results are dumped into', testsavedir)
-        with torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CPU,
-                torch.profiler.ProfilerActivity.CUDA,
-            ]
-        ) as p:            
-            rgbs = sparw_render_viewpoints(
-                render_poses=data_dict['poses'][data_dict['i_test']],
-                depth_maps=depth_maps,
-                HW=data_dict['HW'][data_dict['i_test']],
-                Ks=data_dict['Ks'][data_dict['i_test']],
-                gt_imgs=[data_dict['images'][i].cpu().numpy() for i in data_dict['i_test']],
-                savedir=testsavedir, dump_images=args.dump_images,
-                eval_ssim=args.eval_ssim, eval_lpips_alex=args.eval_lpips_alex, eval_lpips_vgg=args.eval_lpips_vgg,
-                **render_viewpoints_kwargs)
+           
+        rgbs = sparw_render_viewpoints(
+            render_poses=data_dict['poses'][data_dict['i_test']],
+            depth_maps=depth_maps,
+            HW=data_dict['HW'][data_dict['i_test']],
+            Ks=data_dict['Ks'][data_dict['i_test']],
+            gt_imgs=[data_dict['images'][i].cpu().numpy() for i in data_dict['i_test']],
+            savedir=testsavedir, dump_images=args.dump_images,
+            eval_ssim=args.eval_ssim, eval_lpips_alex=args.eval_lpips_alex, eval_lpips_vgg=args.eval_lpips_vgg,
+            **render_viewpoints_kwargs)
             
-            # rgbs, depths, bgmaps = render_viewpoints(
-            #     render_poses=data_dict['poses'][data_dict['i_test']],
-            #     HW=data_dict['HW'][data_dict['i_test']],
-            #     Ks=data_dict['Ks'][data_dict['i_test']],
-            #     gt_imgs=[data_dict['images'][i].cpu().numpy() for i in data_dict['i_test']],
-            #     savedir=testsavedir, dump_images=args.dump_images,
-            #     eval_ssim=args.eval_ssim, eval_lpips_alex=args.eval_lpips_alex, eval_lpips_vgg=args.eval_lpips_vgg,
-            #     **render_viewpoints_kwargs)
-        res = p.key_averages().table(
-            sort_by="self_cuda_time_total", row_limit=-1)
-        with open("log_sparw.log", 'w') as f:
-            f.write(res)
+        # rgbs, depths, bgmaps = render_viewpoints(
+        #     render_poses=data_dict['poses'][data_dict['i_test']],
+        #     HW=data_dict['HW'][data_dict['i_test']],
+        #     Ks=data_dict['Ks'][data_dict['i_test']],
+        #     gt_imgs=[data_dict['images'][i].cpu().numpy() for i in data_dict['i_test']],
+        #     savedir=testsavedir, dump_images=args.dump_images,
+        #     eval_ssim=args.eval_ssim, eval_lpips_alex=args.eval_lpips_alex, eval_lpips_vgg=args.eval_lpips_vgg,
+        #     **render_viewpoints_kwargs)
             
         imageio.mimwrite(os.path.join(testsavedir, 'video.rgb.mp4'), utils.to8b(rgbs), fps=30, quality=8)
 
